@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import axios from "axios";
-import User,{ IUser } from "../models/userCV.model";
+import User, { IUser } from "../models/userCV.model";
 //import * as cheerio from "cheerio";
-
+import jwt from "jsonwebtoken";
 import {
   AwardObjectType,
   CourseObjectType,
@@ -25,22 +25,21 @@ type EducationType = {
   class10School?: string;
   class10Board?: string;
   class10Grade?: string;
-  class10CertUrl?:string,
+  class10CertUrl?: string;
   class12College?: string;
   class12Board?: string;
   class12Grade?: string;
-  class12CertUrl?:string;
+  class12CertUrl?: string;
   underGraduateCollege?: string;
   underGraduateDegree?: string;
   underGraduateGPA?: string;
-  underGraduateDuration?:string;
-  underGraduateCertUrl?:string,
+  underGraduateDuration?: string;
+  underGraduateCertUrl?: string;
   postGraduateCollege?: string;
   postGraduateDegree?: string;
   postGraduateGPA?: string;
-  postGraduateDuration?:string;
-  postGraduateCertUrl?:string,
-
+  postGraduateDuration?: string;
+  postGraduateCertUrl?: string;
 };
 
 // Define the type for personal details object
@@ -51,11 +50,11 @@ type PersonalDetailsType = {
   profession: string;
   imageUrl: string;
   phoneNumber: string;
-  linkedinProfile?:string;
-  twitterProfile?:string;
-  telegramProfile?:string;
-  instagramProfile?:string;
-  githubProfile?:string;
+  linkedinProfile?: string;
+  twitterProfile?: string;
+  telegramProfile?: string;
+  instagramProfile?: string;
+  githubProfile?: string;
   years_of_experience: string;
 };
 
@@ -66,7 +65,7 @@ type AchievementsObjectType = {
 };
 type SkillObjectType = {
   skillName: string;
-  skillUrl?:string,
+  skillUrl?: string;
 };
 
 // Main data type with personal details and education
@@ -92,7 +91,7 @@ type DataToBeStoredType = {
 
 // requestbody type;
 interface RequestBodyType {
-  loginMailId:string,
+  loginMailId: string;
   nanoId: string;
   name: string;
   email: string;
@@ -100,31 +99,31 @@ interface RequestBodyType {
   profession: string;
   imageUrl: string;
   phoneNumber: string;
-  linkedinProfile?:string;
-  twitterProfile?:string;
-  telegramProfile?:string;
-  instagramProfile?:string;
-  githubProfile?:string;
+  linkedinProfile?: string;
+  twitterProfile?: string;
+  telegramProfile?: string;
+  instagramProfile?: string;
+  githubProfile?: string;
   Years_of_experience: string;
   profile_summary: string;
   class10SchoolName: string;
   class10Board: string;
   class10Grade: string;
-  class10CertUrl?:string,
+  class10CertUrl?: string;
   class12CollegeName?: string;
   class12Board?: string;
   class12Grade?: string;
-  class12CertUrl?:string,
+  class12CertUrl?: string;
   underGraduateCollegeName?: string;
   underGraduateDegreeName?: string;
   underGraduateGPA?: string;
-  underGraduateDuration?:string;
-  underGraduateCertUrl?:string,
+  underGraduateDuration?: string;
+  underGraduateCertUrl?: string;
   postGraduateCollegeName?: string;
   postGraduateDegreeName?: string;
   postGraduateGPA?: string;
-  postGraduateDuration?:string;
-  postGraduateCertUrl?:string,
+  postGraduateDuration?: string;
+  postGraduateCertUrl?: string;
   Experience: ExperienceObjectType[] | []; // Experience is an array of objects
   Skills: SkillObjectType[];
   Awards: AwardObjectType[] | [];
@@ -142,7 +141,16 @@ interface RequestBodyType {
 }
 
 export const createCv = async (req: Request, res: Response) => {
-  console.log("req",req.body)
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ error: "Access token required" });
+  }
+
+  const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+  const userId = (decoded as { userId: string }).userId;
+  console.log("userId", userId);
   try {
     const {
       loginMailId,
@@ -193,7 +201,7 @@ export const createCv = async (req: Request, res: Response) => {
       projectsVerifications,
       profileSummaryVerification,
     } = req.body as RequestBodyType;
-    console.log("req body",req.body);
+
     //console.log("undergraduate duration",underGraduateDuration)
     if (
       !loginMailId ||
@@ -292,7 +300,6 @@ export const createCv = async (req: Request, res: Response) => {
     addEducationFields("postGraduateGPA", postGraduateGPA);
     addEducationFields("postGraduateDuration", postGraduateDuration);
     addEducationFields("postGraduateCertUrl", postGraduateCertUrl);
-    
 
     if (Experience?.length > 0) {
       dataToBeStored.experience = Experience;
@@ -322,55 +329,62 @@ export const createCv = async (req: Request, res: Response) => {
       };
     }
 
-    const cvData = await CV.create(dataToBeStored);
-    if(cvData)
-    {
-    // await User.findOneAndUpdate(
-    //   { email:loginMailId },
-    //   { $push: { documentIds: cvData._id } },
-    //   { new: true, upsert: true }
-    // );
-    //mapping of all cv nanoIds with user email
-    //console.log("cvData",cvData);
-    await User.findOneAndUpdate(
-      {email:loginMailId},
-      { $push: { nanoIds: cvData.nanoId } },
-      { new: true, upsert: true }
-    );
+    const cvData = await CV.create({
+      userId: userId,
+      ...dataToBeStored,
+    });
+    if (cvData) {
+      // await User.findOneAndUpdate(
+      //   { email:loginMailId },
+      //   { $push: { documentIds: cvData._id } },
+      //   { new: true, upsert: true }
+      // );
+      //mapping of all cv nanoIds with user email
+      //console.log("cvData",cvData);
+      await User.findOneAndUpdate(
+        { email: loginMailId },
+        { $push: { nanoIds: cvData.nanoId } },
+        { new: true, upsert: true }
+      );
     }
     return res.json(cvData);
   } catch (error) {
     console.log("ERROR:IN CREATE-CV CONTROLLER", error);
-    res.status(500).json({success:false,error:error,message:"ERROR:IN CREATE-CV CONTROLLER"});
+    res.status(500).json({
+      success: false,
+      error: error,
+      message: "ERROR:IN CREATE-CV CONTROLLER",
+    });
   }
 };
 
-export const getAllCvIds= async(req:Request,res:Response)=>{
+export const getAllCvIds = async (req: Request, res: Response) => {
   try {
-    console.log("req params",req.params);
-    const {email} = req.params;
+    console.log("req params", req.params);
+    const { email } = req.params;
     // Find the user by email
     const user: IUser | null = await User.findOne({ email });
-    console.log("user",user);
+    console.log("user", user);
     if (!user) {
       console.log("User not found");
       return res.status(500).json({
-        success:false,
-        message:"No Cv Found"})
-
+        success: false,
+        message: "No Cv Found",
+      });
     }
 
     // Return the array of document IDs
-    const Ids= user.nanoIds.map((id:string) => id.toString());
+    const Ids = user.nanoIds.map((id: string) => id.toString());
 
     //console.log("Ids",Ids);
-    return res.status(200).json({success:true,userData:user});
-    
+    return res.status(200).json({ success: true, userData: user });
   } catch (error) {
     console.log("ERROR:IN getAllCVIds", error);
-    res.status(500).json({success:false,error:error,message:"ERROR:IN getAllCVIds"});
+    res
+      .status(500)
+      .json({ success: false, error: error, message: "ERROR:IN getAllCVIds" });
   }
-}
+};
 
 export const getCv = async (req: Request, res: Response) => {
   try {
@@ -390,7 +404,7 @@ export const getCv = async (req: Request, res: Response) => {
 export const getCvByNanoId = async (req: Request, res: Response) => {
   try {
     const { nanoId } = req.params;
-    console.log("nanoId",nanoId);
+    console.log("nanoId", nanoId);
     const cv = await CV.findOne({ nanoId });
     if (!cv) {
       return res.status(404).json("No CV Found!");
@@ -399,7 +413,11 @@ export const getCvByNanoId = async (req: Request, res: Response) => {
     return res.status(200).json(cv);
   } catch (error) {
     console.log("ERROR:GET_CV_BY_NANO_ID_CONTROLLER", error);
-    res.status(500).json({success:false,error:error,message:"ERROR:GET_CV_BY_NANO_ID_CONTROLLER"});
+    res.status(500).json({
+      success: false,
+      error: error,
+      message: "ERROR:GET_CV_BY_NANO_ID_CONTROLLER",
+    });
   }
 };
 
@@ -420,7 +438,7 @@ export const getCvByNanoId = async (req: Request, res: Response) => {
 //     // Return the array of document IDs
 //     const Ids= user.documentIds.map((id) => id.toString());
 //     return res.status(200).json({success:true,Ids});
-    
+
 //   } catch (error) {
 //     console.log("ERROR:IN getAllCVIds", error);
 //     res.status(500).json("ERROR:IN getAllCVIds CONTROLLER");
@@ -451,7 +469,7 @@ const statusType = {
 export const verifyDoc = async (req: Request, res: Response) => {
   try {
     const { pinataHash, field, subfield, nanoId } = req.params;
-    const actualSubField = subfield.replace(/-/g, ' ');
+    const actualSubField = subfield.replace(/-/g, " ");
     const approveDoc = async () => {
       const fieldPath = `${field}.${actualSubField}.mailStatus`;
       const updatedCv = await CV.findOneAndUpdate(
@@ -459,11 +477,10 @@ export const verifyDoc = async (req: Request, res: Response) => {
         { $set: { [fieldPath]: statusType.approved } },
         { new: true }
       );
-      console.log("updatedCv",updatedCv);
-      if (updatedCv===null) {
+      console.log("updatedCv", updatedCv);
+      if (updatedCv === null) {
         window.alert("User has not submitted their CV");
         return res.status(404).json({ message: "CV not found!" });
-        
       }
 
       console.log("Mail status updated");

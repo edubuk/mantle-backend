@@ -6,6 +6,7 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import uploadRouter from "../routers/upload.router";
 import authRouter from "../routers/auth.router";
+import trujobsRouter from "../routers/trujobs.route";
 
 config();
 const app = express();
@@ -19,13 +20,13 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // Routes
 app.use("/auth", authRouter);
 app.use("/cv", cvRouter);
-app.use("/file",uploadRouter);
+app.use("/file", uploadRouter);
+app.use("/trujobs", trujobsRouter);
 app.get("/", (req: Request, res: Response) => {
   return res.json({
     message: "Health is ok !",
   });
 });
-
 
 app.listen(process.env.PORT, () => {
   MongoConnection();
