@@ -48,7 +48,7 @@ export const register = async (req: Request, res: Response) => {
       expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 mins
     });
 
-    //await sendOtpEmail(email, otp);
+    await sendOtpEmail(email, otp);
 
     // Store password temporarily on frontend (NOT backend)
     res.status(200).json({
@@ -137,7 +137,7 @@ export const verifyOtp = async (req: Request, res: Response) => {
       token,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Registration failed. Server error", error });
   }
 };
 
