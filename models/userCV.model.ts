@@ -34,7 +34,6 @@ const UserSchema: Schema = new Schema<IUser>({
   },
   nanoIds: [{
     type: String,
-    unique: true,
   }],
 });
 
